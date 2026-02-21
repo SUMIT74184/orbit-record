@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FolderKanban, MoreHorizontal, Clock, CheckCircle, Plus, Trash2 } from "lucide-react";
+import { FolderKanban, Plus, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,6 +71,25 @@ const Projects = () => {
     else setProjects(projects.filter((p) => p.id !== id));
   };
 
+  const updateProgress = async (id: string, progress: number) => {
+    // Optimistic update
+    setProjects(projects.map((p) => (p.id === id ? { ...p, progress } : p)));
+    
+    const { error } = await supabase
+      .from("projects")
+      .update({ progress })
+      .eq("id", id);
+    
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      fetchProjects(); // revert
+    } else if (progress === 100 && user) {
+      // Log completion activity
+      await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed" });
+      toast({ title: "🎉 Project completed!", description: "Great job finishing this project!" });
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="mb-8 flex items-center justify-between">
@@ -126,12 +146,22 @@ const Projects = () => {
                 </div>
                 <h3 className="font-semibold mb-1">{project.name}</h3>
                 {project.description && <p className="text-sm text-muted-foreground mb-4">{project.description}</p>}
-                <div className="mb-3">
+                
+                {/* Progress with interactive slider */}
+                <div className="mb-2">
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="text-muted-foreground">Progress</span>
-                    <span className="text-foreground font-medium">{project.progress}%</span>
+                    <span className={`font-medium ${project.progress === 100 ? "text-primary" : "text-foreground"}`}>
+                      {project.progress}%{project.progress === 100 && " ✓"}
+                    </span>
                   </div>
-                  <Progress value={project.progress} className="h-1.5" />
+                  <Slider
+                    value={[project.progress]}
+                    onValueCommit={(val) => updateProgress(project.id, val[0])}
+                    max={100}
+                    step={5}
+                    className="cursor-pointer"
+                  />
                 </div>
               </motion.div>
             );

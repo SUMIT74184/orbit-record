@@ -1,18 +1,57 @@
 import { useMemo } from "react";
+import { format, subDays, parseISO } from "date-fns";
+
+interface ActivityEntry {
+  activity_date: string;
+  count: number;
+}
 
 interface ContributionChartProps {
-  data?: number[];
+  activityData?: ActivityEntry[];
   weeks?: number;
 }
 
-const ContributionChart = ({ data, weeks = 52 }: ContributionChartProps) => {
-  const contributions = useMemo(() => {
-    if (data) return data;
-    // Generate mock data
-    return Array.from({ length: weeks * 7 }, () =>
-      Math.random() > 0.3 ? Math.floor(Math.random() * 5) : 0
-    );
-  }, [data, weeks]);
+const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps) => {
+  const { grid, monthLabels } = useMemo(() => {
+    const today = new Date();
+    const totalDays = weeks * 7;
+    const startDate = subDays(today, totalDays - 1);
+
+    // Build a map of date -> count from real data
+    const dateMap = new Map<string, number>();
+    if (activityData) {
+      activityData.forEach((entry) => {
+        const key = entry.activity_date;
+        dateMap.set(key, (dateMap.get(key) || 0) + entry.count);
+      });
+    }
+
+    // Build grid: array of weeks, each containing 7 days
+    const grid: { date: Date; count: number; dateStr: string }[][] = [];
+    const monthLabels: { label: string; weekIdx: number }[] = [];
+    let lastMonth = -1;
+
+    for (let w = 0; w < weeks; w++) {
+      const week: { date: Date; count: number; dateStr: string }[] = [];
+      for (let d = 0; d < 7; d++) {
+        const dayIdx = w * 7 + d;
+        const date = subDays(today, totalDays - 1 - dayIdx);
+        const dateStr = format(date, "yyyy-MM-dd");
+        const count = dateMap.get(dateStr) || 0;
+        week.push({ date, count, dateStr });
+
+        // Track month labels
+        const month = date.getMonth();
+        if (month !== lastMonth && d === 0) {
+          monthLabels.push({ label: format(date, "MMM"), weekIdx: w });
+          lastMonth = month;
+        }
+      }
+      grid.push(week);
+    }
+
+    return { grid, monthLabels };
+  }, [activityData, weeks]);
 
   const getLevel = (count: number) => {
     if (count === 0) return 0;
@@ -22,12 +61,19 @@ const ContributionChart = ({ data, weeks = 52 }: ContributionChartProps) => {
     return 4;
   };
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const days = ["Mon", "", "Wed", "", "Fri", "", ""];
+
+  const totalActivities = useMemo(
+    () => grid.flat().reduce((sum, d) => sum + d.count, 0),
+    [grid]
+  );
 
   return (
     <div className="glass-card p-6">
-      <h3 className="text-sm font-medium text-foreground mb-4">Activity Overview</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-foreground">Activity Overview</h3>
+        <span className="text-xs text-muted-foreground">{totalActivities} activities in the last {weeks} weeks</span>
+      </div>
       <div className="flex gap-1">
         <div className="flex flex-col gap-1 mr-2 text-[10px] text-muted-foreground">
           {days.map((d, i) => (
@@ -36,32 +82,41 @@ const ContributionChart = ({ data, weeks = 52 }: ContributionChartProps) => {
         </div>
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-[3px] min-w-fit">
-            {Array.from({ length: weeks }, (_, weekIdx) => (
+            {grid.map((week, weekIdx) => (
               <div key={weekIdx} className="flex flex-col gap-[3px]">
-                {Array.from({ length: 7 }, (_, dayIdx) => {
-                  const idx = weekIdx * 7 + dayIdx;
-                  const level = getLevel(contributions[idx] || 0);
+                {week.map((day, dayIdx) => {
+                  const level = getLevel(day.count);
+                  const isFuture = day.date > new Date();
                   return (
                     <div
                       key={dayIdx}
-                      className={`w-[12px] h-[12px] rounded-[2px] contribution-${level} transition-colors hover:ring-1 hover:ring-primary/50`}
-                      title={`${contributions[idx] || 0} activities`}
+                      className={`w-[12px] h-[12px] rounded-[2px] transition-colors hover:ring-1 hover:ring-primary/50 ${
+                        isFuture ? "opacity-20 contribution-0" : `contribution-${level}`
+                      }`}
+                      title={`${format(day.date, "MMM d, yyyy")}: ${day.count} activit${day.count === 1 ? "y" : "ies"}`}
                     />
                   );
                 })}
               </div>
             ))}
           </div>
-          <div className="flex mt-2 text-[10px] text-muted-foreground">
-            {months.map((m, i) => (
-              <div key={i} className="flex-1 text-center">{m}</div>
+          {/* Month labels */}
+          <div className="flex mt-2 text-[10px] text-muted-foreground relative" style={{ height: 14 }}>
+            {monthLabels.map((m, i) => (
+              <div
+                key={i}
+                className="absolute"
+                style={{ left: `${(m.weekIdx / weeks) * 100}%` }}
+              >
+                {m.label}
+              </div>
             ))}
           </div>
         </div>
       </div>
       <div className="flex items-center gap-2 mt-4 text-[10px] text-muted-foreground">
         <span>Less</span>
-        {[0, 1, 2, 3, 4].map(l => (
+        {[0, 1, 2, 3, 4].map((l) => (
           <div key={l} className={`w-[12px] h-[12px] rounded-[2px] contribution-${l}`} />
         ))}
         <span>More</span>
