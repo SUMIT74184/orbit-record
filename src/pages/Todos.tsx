@@ -7,6 +7,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface Todo {
   id: string;
@@ -52,11 +53,17 @@ const Todos = () => {
     } else if (data) {
       setTodos([data, ...todos]);
       setNewTodo("");
-      // Log activity
-      await supabase.from("activity_log").insert({
+      // Log activity with proper date and handle possible errors
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { error: activityError } = await supabase.from("activity_log").insert({
         user_id: user.id,
         activity_type: "todo_created",
+        activity_date: today,
       });
+      if (activityError) {
+        // Surface insertion error so it's visible during debugging
+        toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
+      }
     }
   };
 
@@ -70,15 +77,23 @@ const Todos = () => {
     } else {
       setTodos(todos.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
       if (!completed && user) {
-        await supabase.from("activity_log").insert({
+        const today = format(new Date(), "yyyy-MM-dd");
+        const { error: activityError } = await supabase.from("activity_log").insert({
           user_id: user.id,
           activity_type: "todo_completed",
+          activity_date: today,
         });
+        if (activityError) {
+          toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
+        }
       }
     }
   };
 
   const deleteTodo = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this todo?");
+    if (!confirmed) return;
+
     const { error } = await supabase.from("todos").delete().eq("id", id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });

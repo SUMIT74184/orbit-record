@@ -16,6 +16,11 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Check for email verification redirect
+  const searchParams = new URLSearchParams(window.location.search);
+  const hasError = searchParams.get('error');
+  const isUnverified = searchParams.get('unverified') === 'true';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,8 +31,20 @@ const Login = () => {
     setLoading(true);
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        
+        // Email verification check disabled for development
+        // To enable: uncomment check below and configure Supabase email
+        // if (!data.user?.email_confirmed_at) {
+        //   toast({ 
+        //     title: "Email not verified", 
+        //     description: "Please check your email and click the verification link before signing in.",
+        //     variant: "destructive"
+        //   });
+        //   return;
+        // }
+        
         toast({ title: "Welcome back!" });
         navigate("/dashboard");
       } else {
@@ -41,14 +58,15 @@ const Login = () => {
           password,
           options: {
             data: { name: name || undefined },
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${window.location.origin}/login`,
           },
         });
         if (error) throw error;
         toast({
           title: "Check your email!",
-          description: "We sent you a verification link. Please verify your email before signing in.",
+          description: "We sent you a verification link. Please verify your email and then sign in.",
         });
+        setIsLogin(true);
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -66,7 +84,7 @@ const Login = () => {
         provider,
         options: {
           skipBrowserRedirect: isIframe,
-          redirectTo: window.location.origin + "/dashboard",
+          redirectTo: "/dashboard",
         },
       });
       
@@ -126,6 +144,13 @@ const Login = () => {
           <p className="text-muted-foreground mb-8">
             {isLogin ? "Enter your credentials to continue" : "Start tracking your consistency today"}
           </p>
+          
+          {isUnverified && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-6 text-sm">
+              <p className="text-amber-600 font-medium">Email not verified</p>
+              <p className="text-amber-600/80 text-xs mt-1">Please check your email for the verification link and verify your account before accessing the dashboard.</p>
+            </div>
+          )}
 
           {/* Social login */}
           <Button variant="outline" className="w-full h-11 mb-4" onClick={() => handleSocialLogin("google")}>

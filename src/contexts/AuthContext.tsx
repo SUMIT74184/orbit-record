@@ -43,8 +43,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Use setTimeout to avoid potential deadlock with Supabase
-          setTimeout(() => checkAdminRole(session.user.id), 0);
+          // Use a microtask to avoid potential deadlock with Supabase
+          Promise.resolve().then(() => checkAdminRole(session.user.id));
         } else {
           setIsAdmin(false);
         }

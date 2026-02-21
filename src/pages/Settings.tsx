@@ -62,12 +62,35 @@ const Settings = () => {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm("Are you sure you want to delete your account? This action cannot be undone.");
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action is irreversible and will permanently delete all your data."
+    );
     if (!confirmed) return;
-    // Sign out and inform - actual deletion requires admin/edge function
-    await signOut();
-    toast({ title: "Account deletion requested", description: "Please contact support to complete account deletion." });
-    navigate("/");
+
+    // IMPORTANT: Secure account deletion must be handled server-side.
+    // A Supabase Edge Function should be created to:
+    // 1. Verify the user is authenticated.
+    // 2. Delete all user-related data from storage and database tables (e.g., projects, todos).
+    // 3. Delete the user from the `auth.users` table using the service_role key.
+    // The function below is a placeholder for client-side feedback.
+    
+    // Example of invoking an edge function:
+    // const { error } = await supabase.functions.invoke('delete-user');
+    // if (error) {
+    //   toast({ title: "Error", description: "Could not delete account. Please try again.", variant: "destructive" });
+    // } else {
+    //   await signOut();
+    //   toast({ title: "Account deleted successfully." });
+    //   navigate("/");
+    // }
+
+    // Placeholder implementation:
+    toast({
+      title: "Account Deletion Not Implemented",
+      description: "This feature requires server-side implementation. Please contact support to have your account deleted.",
+      variant: "destructive",
+      duration: 10000,
+    });
   };
 
   const initials = displayName

@@ -178,3 +178,29 @@ CREATE POLICY "Users can create own activity" ON public.activity_log FOR INSERT 
 CREATE POLICY "Admins can view all todos" ON public.todos FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
 CREATE POLICY "Admins can view all projects" ON public.projects FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
 CREATE POLICY "Admins can view all activity" ON public.activity_log FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
+
+-- Function to log activity
+CREATE OR REPLACE FUNCTION public.log_activity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.activity_log (user_id, activity_type)
+  VALUES (NEW.user_id, TG_TABLE_NAME);
+  RETURN NEW;
+END;
+$$;
+
+-- Trigger for new todos
+CREATE TRIGGER on_todo_created_log_activity
+  AFTER INSERT ON public.todos
+  FOR EACH ROW
+  EXECUTE FUNCTION public.log_activity();
+
+-- Trigger for new projects
+CREATE TRIGGER on_project_created_log_activity
+  AFTER INSERT ON public.projects
+  FOR EACH ROW
+  EXECUTE FUNCTION public.log_activity();

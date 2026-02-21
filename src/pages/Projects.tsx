@@ -11,6 +11,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface Project {
   id: string;
@@ -61,11 +62,18 @@ const Projects = () => {
       setNewName("");
       setNewDesc("");
       setDialogOpen(false);
-      await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_created" });
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_created", activity_date: today });
+      if (activityError) {
+        toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
+      }
     }
   };
 
   const deleteProject = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this project?");
+    if (!confirmed) return;
+
     const { error } = await supabase.from("projects").delete().eq("id", id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else setProjects(projects.filter((p) => p.id !== id));
@@ -85,7 +93,11 @@ const Projects = () => {
       fetchProjects(); // revert
     } else if (progress === 100 && user) {
       // Log completion activity
-      await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed" });
+      const today = format(new Date(), "yyyy-MM-dd");
+      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed", activity_date: today });
+      if (activityError) {
+        toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
+      }
       toast({ title: "🎉 Project completed!", description: "Great job finishing this project!" });
     }
   };
@@ -149,12 +161,13 @@ const Projects = () => {
                 
                 {/* Progress with interactive slider */}
                 <div className="mb-2">
-                  <div className="flex justify-between text-xs mb-1.5">
+                  <div className="flex justify-between text-xs mb-2">
                     <span className="text-muted-foreground">Progress</span>
                     <span className={`font-medium ${project.progress === 100 ? "text-primary" : "text-foreground"}`}>
                       {project.progress}%{project.progress === 100 && " ✓"}
                     </span>
                   </div>
+                  <Progress value={project.progress} className="h-2 mb-2" />
                   <Slider
                     value={[project.progress]}
                     onValueCommit={(val) => updateProgress(project.id, val[0])}

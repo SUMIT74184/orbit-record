@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { format, subDays, parseISO } from "date-fns";
+import { format, addDays, subDays, startOfWeek } from "date-fns";
 
 interface ActivityEntry {
   activity_date: string;
@@ -15,9 +15,11 @@ const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps)
   const { grid, monthLabels } = useMemo(() => {
     const today = new Date();
     const totalDays = weeks * 7;
-    const startDate = subDays(today, totalDays - 1);
 
-    // Build a map of date -> count from real data
+    // Start from the beginning of the week (Sunday) so columns align like GitHub
+    const start = startOfWeek(subDays(today, totalDays - 1), { weekStartsOn: 0 });
+
+    // Build a map of date -> count from passed-in activity data
     const dateMap = new Map<string, number>();
     if (activityData) {
       activityData.forEach((entry) => {
@@ -26,7 +28,7 @@ const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps)
       });
     }
 
-    // Build grid: array of weeks, each containing 7 days
+    // Build grid: array of weeks (columns), each containing 7 days (rows)
     const grid: { date: Date; count: number; dateStr: string }[][] = [];
     const monthLabels: { label: string; weekIdx: number }[] = [];
     let lastMonth = -1;
@@ -34,17 +36,19 @@ const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps)
     for (let w = 0; w < weeks; w++) {
       const week: { date: Date; count: number; dateStr: string }[] = [];
       for (let d = 0; d < 7; d++) {
-        const dayIdx = w * 7 + d;
-        const date = subDays(today, totalDays - 1 - dayIdx);
+        const idx = w * 7 + d;
+        const date = addDays(start, idx);
         const dateStr = format(date, "yyyy-MM-dd");
         const count = dateMap.get(dateStr) || 0;
         week.push({ date, count, dateStr });
 
-        // Track month labels
-        const month = date.getMonth();
-        if (month !== lastMonth && d === 0) {
-          monthLabels.push({ label: format(date, "MMM"), weekIdx: w });
-          lastMonth = month;
+        // Track month labels on the first row of each week (Sunday)
+        if (d === 0) {
+          const month = date.getMonth();
+          if (month !== lastMonth) {
+            monthLabels.push({ label: format(date, "MMM"), weekIdx: w });
+            lastMonth = month;
+          }
         }
       }
       grid.push(week);
@@ -61,7 +65,8 @@ const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps)
     return 4;
   };
 
-  const days = ["Mon", "", "Wed", "", "Fri", "", ""];
+  // Show weekday labels on the left (Sun-Sat) to match GitHub style
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const totalActivities = useMemo(
     () => grid.flat().reduce((sum, d) => sum + d.count, 0),
@@ -114,6 +119,13 @@ const ContributionChart = ({ activityData, weeks = 26 }: ContributionChartProps)
           </div>
         </div>
       </div>
+      {/* Debug panel to help verify data from DB in development */}
+      {process.env.NODE_ENV !== "production" && (
+        <details className="mt-4 text-xs text-muted-foreground">
+          <summary className="cursor-pointer">Debug: raw activity data</summary>
+          <pre className="mt-2 p-2 bg-secondary rounded text-[11px] overflow-auto max-h-40">{JSON.stringify(activityData || [], null, 2)}</pre>
+        </details>
+      )}
       <div className="flex items-center gap-2 mt-4 text-[10px] text-muted-foreground">
         <span>Less</span>
         {[0, 1, 2, 3, 4].map((l) => (
