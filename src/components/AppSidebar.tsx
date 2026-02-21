@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -12,18 +12,27 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: CheckSquare, label: "Todos", path: "/todos" },
-  { icon: FolderKanban, label: "Projects", path: "/projects" },
-  { icon: BarChart3, label: "Analytics", path: "/dashboard" },
-  { icon: Settings, label: "Settings", path: "/settings" },
-];
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAdmin, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: CheckSquare, label: "Todos", path: "/todos" },
+    { icon: FolderKanban, label: "Projects", path: "/projects" },
+    { icon: Settings, label: "Settings", path: "/settings" },
+  ];
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  const initials = user?.email ? user.email[0].toUpperCase() : "?";
 
   const SidebarContent = () => (
     <>
@@ -36,12 +45,25 @@ const AppSidebar = () => {
         </Link>
       </div>
 
+      {/* User info */}
+      <div className="px-4 py-3 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs text-primary font-medium">
+            {initials}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-sm font-medium truncate">{user?.email}</p>
+            {isAdmin && <p className="text-[10px] text-primary">Admin</p>}
+          </div>
+        </div>
+      </div>
+
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
-              key={item.path + item.label}
+              key={item.path}
               to={item.path}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
@@ -58,29 +80,33 @@ const AppSidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-border/50 space-y-1">
-        <Link
-          to="/admin"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground transition-all"
-        >
-          <Shield size={18} />
-          Admin
-        </Link>
-        <Link
-          to="/login"
-          onClick={() => setMobileOpen(false)}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-all"
+        {isAdmin && (
+          <Link
+            to="/admin"
+            onClick={() => setMobileOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+              location.pathname === "/admin"
+                ? "bg-primary/15 text-primary font-medium"
+                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground"
+            }`}
+          >
+            <Shield size={18} />
+            Admin
+          </Link>
+        )}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-all w-full"
         >
           <LogOut size={18} />
           Logout
-        </Link>
+        </button>
       </div>
     </>
   );
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-card border border-border"
         onClick={() => setMobileOpen(!mobileOpen)}
@@ -88,7 +114,6 @@ const AppSidebar = () => {
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -101,7 +126,6 @@ const AppSidebar = () => {
         )}
       </AnimatePresence>
 
-      {/* Mobile sidebar */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.aside
@@ -116,7 +140,6 @@ const AppSidebar = () => {
         )}
       </AnimatePresence>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-[260px] min-h-screen bg-sidebar border-r border-sidebar-border flex-col fixed left-0 top-0 bottom-0">
         <SidebarContent />
       </aside>
