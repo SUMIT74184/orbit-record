@@ -107,36 +107,53 @@ const Dashboard = () => {
       });
     };
     fetchData();
+    const refetchAll = async () => {
+      const [todosRes, projectsRes, activityRes] = await Promise.all([
+        supabase.from("todos").select("completed").eq("user_id", user.id),
+        supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }),
+        supabase
+          .from("activity_log")
+          .select("activity_date, count")
+          .eq("user_id", user.id)
+          .gte("activity_date", format(subDays(new Date(), 365), "yyyy-MM-dd"))
+          .order("activity_date", { ascending: true }),
+      ]);
+
+      const todosData = todosRes.data || [];
+      const projectsData = projectsRes.data || [];
+      const completed = todosData.filter((t) => t.completed).length;
+      const activities = (activityRes.data || []) as ActivityEntry[];
+
+      const map = new Map<string, number>();
+      activities.forEach((a) => {
+        const d = a.activity_date;
+        map.set(d, (map.get(d) || 0) + (a.count || 0));
+      });
+      const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
+        .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
+
+      const activeDates = new Set(aggregated.map((a) => a.activity_date));
+
+      setTodos(todosData);
+      setProjects(projectsData);
+      setActivityData(aggregated);
+      setStats({
+        totalTodos: todosData.length,
+        completedTodos: completed,
+        totalProjects: projectsData.length,
+        streak: calculateStreak(activeDates),
+      });
+    };
+
     const channel = supabase.channel(`public:activity_log:user=${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log', filter: `user_id=eq.${user.id}` }, (payload) => {
-        const updatedRow = payload.new as unknown as ActivityEntry;
-
-        setActivityData((prev) => {
-          const next = [...prev];
-          const idx = next.findIndex(e => e.activity_date === updatedRow.activity_date);
-          if (idx !== -1) {
-            // Replace count with the new total count from updatedRow
-            next[idx] = { ...next[idx], count: updatedRow.count };
-          } else {
-            next.push({ activity_date: updatedRow.activity_date, count: updatedRow.count });
-          }
-          next.sort((a, b) => a.activity_date.localeCompare(b.activity_date));
-          const activeDates = new Set(next.map((a) => a.activity_date));
-          setStats((s) => ({ ...s, streak: calculateStreak(activeDates) }));
-          return next;
-        });
-
-        supabase.from("todos").select("completed").eq("user_id", user.id).then(res => {
-          const todosData = res.data || [];
-          const completed = todosData.filter((t) => t.completed).length;
-          setTodos(todosData);
-          setStats(s => ({ ...s, totalTodos: todosData.length, completedTodos: completed }));
-        });
-        supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }).then(res => {
-          const projectsData = res.data || [];
-          setProjects(projectsData);
-          setStats(s => ({ ...s, totalProjects: projectsData.length }));
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log', filter: `user_id=eq.${user.id}` }, () => {
+        refetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${user.id}` }, () => {
+        refetchAll();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${user.id}` }, () => {
+        refetchAll();
       })
       .subscribe();
 
