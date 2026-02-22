@@ -51,24 +51,69 @@
     --chart-5: 340 75% 55%;
 
     /* Contribution heatmap levels */
-    --contrib-0: 220 15% 12%;
-    --contrib-1: 160 50% 20%;
-    --contrib-2: 160 65% 30%;
-    --contrib-3: 160 75% 38%;
-    --contrib-4: 160 84% 45%;
-
-    /* Gradient tokens */
-    --gradient-hero: linear-gradient(135deg, hsl(160 84% 39%), hsl(200 70% 50%));
-    --gradient-card: linear-gradient(145deg, hsl(222 18% 13%), hsl(222 18% 9%));
-
-    /* Shadow tokens */
-    --shadow-glow: 0 0 30px -5px hsl(160 84% 39% / 0.2);
-    --shadow-card: 0 4px 20px -4px hsl(0 0% 0% / 0.3);
+    --contrib-0: hsl(220 15% 25%); /* Lighter gray for no activity */
+    --contrib-1: hsl(160 84% 60%); /* More noticeable color for low activity */
+    --contrib-2: hsl(160 84% 50%);
+    --contrib-3: hsl(160 84% 40%);
+    --contrib-4: hsl(160 84% 30%);
   }
 
+  /* Light mode themes */
+  :root[data-theme="github"] {
+    --contrib-0: #ebedf0;
+    --contrib-1: #9be9a8;
+    --contrib-2: #40c463;
+    --contrib-3: #30a14e;
+    --contrib-4: #216e39;
+  }
+  :root[data-theme="gitlab"] {
+    --contrib-0: #ededed;
+    --contrib-1: #acd5f2;
+    --contrib-2: #7ba9d7;
+    --contrib-3: #4972b1;
+    --contrib-4: #254e8c;
+  }
+  :root[data-theme="halloween"] {
+    --contrib-0: #ebedf0;
+    --contrib-1: #ffee4a;
+    --contrib-2: #ffc501;
+    --contrib-3: #fe9600;
+    --contrib-4: #ff6c00;
+  }
+
+  /* Dark mode themes */
   .dark {
     --background: 222 20% 7%;
     --foreground: 210 20% 92%;
+    
+    /* Default dark contrib colors */
+    --contrib-0: hsl(220 15% 20%); /* Lighter gray for no activity in dark mode */
+    --contrib-1: hsl(160 84% 50%); /* More noticeable color for low activity in dark mode */
+    --contrib-2: hsl(160 84% 40%);
+    --contrib-3: hsl(160 84% 30%);
+    --contrib-4: hsl(160 84% 20%);
+  }
+
+  .dark[data-theme="github"] {
+    --contrib-0: #161b22;
+    --contrib-1: #0e4429;
+    --contrib-2: #006d32;
+    --contrib-3: #26a641;
+    --contrib-4: #39d353;
+  }
+  .dark[data-theme="gitlab"] {
+    --contrib-0: #222222;
+    --contrib-1: #32324a;
+    --contrib-2: #41416a;
+    --contrib-3: #585892;
+    --contrib-4: #7575c3;
+  }
+  .dark[data-theme="halloween"] {
+    --contrib-0: #161b22;
+    --contrib-1: #631c03;
+    --contrib-2: #bd561d;
+    --contrib-3: #fa7a18;
+    --contrib-4: #fddf68;
   }
 }
 
@@ -113,9 +158,9 @@
     box-shadow: var(--shadow-glow);
   }
 
-  .contribution-0 { background-color: hsl(var(--contrib-0)); }
-  .contribution-1 { background-color: hsl(var(--contrib-1)); }
-  .contribution-2 { background-color: hsl(var(--contrib-2)); }
-  .contribution-3 { background-color: hsl(var(--contrib-3)); }
-  .contribution-4 { background-color: hsl(var(--contrib-4)); }
+  .contribution-0 { background-color: var(--contrib-0); }
+  .contribution-1 { background-color: var(--contrib-1); }
+  .contribution-2 { background-color: var(--contrib-2); }
+  .contribution-3 { background-color: var(--contrib-3); }
+  .contribution-4 { background-color: var(--contrib-4); }
 }

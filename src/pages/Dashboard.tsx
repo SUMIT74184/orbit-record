@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle, FolderKanban, Flame, TrendingUp } from "lucide-react";
+import { CheckCircle, FolderKanban, Flame, TrendingUp, GitCommit, GitBranch } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import StatsCard from "@/components/StatsCard";
 import ContributionChart from "@/components/ContributionChart";
+import ContributionChartGithubStyle from "@/components/ContributionChartGithubStyle";
 import ProjectsProgressChart from "@/components/ProjectsProgressChart";
 import TodosStatusChart from "@/components/TodosStatusChart";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface ActivityEntry {
   activity_date: string;
@@ -46,12 +50,21 @@ const calculateStreak = (activeDates: Set<string>): number => {
   return streak;
 };
 
+type ChartStyle = "default" | "github";
+type Theme = "default" | "github" | "gitlab" | "halloween";
+
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({ totalTodos: 0, completedTodos: 0, totalProjects: 0, streak: 0 });
   const [todos, setTodos] = useState<Todo[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activityData, setActivityData] = useState<ActivityEntry[]>([]);
+  const [chartStyle, setChartStyle] = useState<ChartStyle>("default");
+  const [theme, setTheme] = useState<Theme>("default");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!user) return;
@@ -71,11 +84,20 @@ const Dashboard = () => {
       const projectsData = projectsRes.data || [];
       const completed = todosData.filter((t) => t.completed).length;
       const activities = (activityRes.data || []) as ActivityEntry[];
-      const activeDates = new Set(activities.map((a) => a.activity_date));
+
+      const map = new Map<string, number>();
+      activities.forEach((a) => {
+        const d = a.activity_date;
+        map.set(d, (map.get(d) || 0) + (a.count || 0));
+      });
+      const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
+        .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
+
+      const activeDates = new Set(aggregated.map((a) => a.activity_date));
 
       setTodos(todosData);
       setProjects(projectsData);
-      setActivityData(activities);
+      setActivityData(aggregated);
 
       setStats({
         totalTodos: todosData.length,
@@ -85,23 +107,40 @@ const Dashboard = () => {
       });
     };
     fetchData();
-    // Subscribe to realtime inserts on activity_log so the chart updates immediately
     const channel = supabase.channel(`public:activity_log:user=${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `user_id=eq.${user.id}` }, (payload) => {
-        const newRow = payload.new as unknown as ActivityEntry;
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log', filter: `user_id=eq.${user.id}` }, (payload) => {
+        const updatedRow = payload.new as unknown as ActivityEntry;
+
         setActivityData((prev) => {
-          const next = [...prev, newRow];
-          // Update streak based on the new list of activity dates
+          const next = [...prev];
+          const idx = next.findIndex(e => e.activity_date === updatedRow.activity_date);
+          if (idx !== -1) {
+            // Replace count with the new total count from updatedRow
+            next[idx] = { ...next[idx], count: updatedRow.count };
+          } else {
+            next.push({ activity_date: updatedRow.activity_date, count: updatedRow.count });
+          }
+          next.sort((a, b) => a.activity_date.localeCompare(b.activity_date));
           const activeDates = new Set(next.map((a) => a.activity_date));
           setStats((s) => ({ ...s, streak: calculateStreak(activeDates) }));
           return next;
+        });
+
+        supabase.from("todos").select("completed").eq("user_id", user.id).then(res => {
+          const todosData = res.data || [];
+          const completed = todosData.filter((t) => t.completed).length;
+          setTodos(todosData);
+          setStats(s => ({ ...s, totalTodos: todosData.length, completedTodos: completed }));
+        });
+        supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }).then(res => {
+          const projectsData = res.data || [];
+          setProjects(projectsData);
+          setStats(s => ({ ...s, totalProjects: projectsData.length }));
         });
       })
       .subscribe();
 
     return () => {
-      // cleanup subscription
-      // supabase.channel().unsubscribe is available; using removeChannel
       try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
     };
   }, [user]);
@@ -122,8 +161,41 @@ const Dashboard = () => {
         <StatsCard icon={TrendingUp} title="Completion" value={`${completionRate}%`} delay={0.3} />
       </div>
 
+      <div className="flex justify-end items-center gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="chart-style-switch" className="flex gap-2 items-center text-sm">
+            <GitCommit size={16} /> Default
+          </Label>
+          <Switch
+            id="chart-style-switch"
+            checked={chartStyle === 'github'}
+            onCheckedChange={(checked) => setChartStyle(checked ? 'github' : 'default')}
+          />
+          <Label htmlFor="chart-style-switch" className="flex gap-2 items-center text-sm">
+            <GitBranch size={16} /> GitHub Style
+          </Label>
+        </div>
+        <div className="w-48">
+          <Select value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="github">GitHub</SelectItem>
+              <SelectItem value="gitlab">GitLab</SelectItem>
+              <SelectItem value="halloween">Halloween</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-8">
-        <ContributionChart activityData={activityData} weeks={52} />
+        {chartStyle === 'default' ? (
+          <ContributionChart activityData={activityData} weeks={52} />
+        ) : (
+          <ContributionChartGithubStyle activityData={activityData} weeks={52} />
+        )}
       </motion.div>
 
       <motion.div 

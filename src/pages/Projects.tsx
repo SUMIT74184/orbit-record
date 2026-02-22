@@ -62,11 +62,6 @@ const Projects = () => {
       setNewName("");
       setNewDesc("");
       setDialogOpen(false);
-      const today = format(new Date(), "yyyy-MM-dd");
-      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_created", activity_date: today });
-      if (activityError) {
-        toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
-      }
     }
   };
 
@@ -92,9 +87,9 @@ const Projects = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       fetchProjects(); // revert
     } else if (progress === 100 && user) {
-      // Log completion activity
+      // Log completion activity so the contribution chart can show it
       const today = format(new Date(), "yyyy-MM-dd");
-      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed", activity_date: today });
+      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed", activity_date: today,count:1 });
       if (activityError) {
         toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
       }
