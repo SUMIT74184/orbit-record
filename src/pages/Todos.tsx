@@ -44,12 +44,12 @@ const Todos = () => {
   const logActivity = async (activityType: string) => {
     if (!user) return;
     const today = format(new Date(), "yyyy-MM-dd");
-    const { data: existing } = await supabase
+    const { data: existing, error } = await supabase
       .from("activity_log")
       .select("count")
       .eq("user_id", user.id)
       .eq("activity_date", today)
-      .single();
+      .maybeSingle();
     
     if (existing) {
       await supabase

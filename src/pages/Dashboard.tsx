@@ -66,94 +66,61 @@ const Dashboard = () => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
+  const fetchDashboardData = async () => {
+    if (!user) return;
+    
+    const [todosRes, projectsRes, activityRes] = await Promise.all([
+      supabase.from("todos").select("completed").eq("user_id", user.id),
+      supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }),
+      supabase
+        .from("activity_log")
+        .select("activity_date, count")
+        .eq("user_id", user.id)
+        .gte("activity_date", format(subDays(new Date(), 365), "yyyy-MM-dd"))
+        .order("activity_date", { ascending: true }),
+    ]);
+
+    const todosData = todosRes.data || [];
+    const projectsData = projectsRes.data || [];
+    const completed = todosData.filter((t) => t.completed).length;
+    const activities = (activityRes.data || []) as ActivityEntry[];
+
+    const map = new Map<string, number>();
+    activities.forEach((a) => {
+      const d = a.activity_date;
+      map.set(d, (map.get(d) || 0) + (a.count || 0));
+    });
+    const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
+      .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
+
+    const activeDates = new Set(aggregated.map((a) => a.activity_date));
+
+    setTodos(todosData);
+    setProjects(projectsData);
+    setActivityData(aggregated);
+
+    setStats({
+      totalTodos: todosData.length,
+      completedTodos: completed,
+      totalProjects: projectsData.length || 0,
+      streak: calculateStreak(activeDates),
+    });
+  };
+
   useEffect(() => {
     if (!user) return;
-    const fetchData = async () => {
-      const [todosRes, projectsRes, activityRes] = await Promise.all([
-        supabase.from("todos").select("completed").eq("user_id", user.id),
-        supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }),
-        supabase
-          .from("activity_log")
-          .select("activity_date, count")
-          .eq("user_id", user.id)
-          .gte("activity_date", format(subDays(new Date(), 365), "yyyy-MM-dd"))
-          .order("activity_date", { ascending: true }),
-      ]);
-
-      const todosData = todosRes.data || [];
-      const projectsData = projectsRes.data || [];
-      const completed = todosData.filter((t) => t.completed).length;
-      const activities = (activityRes.data || []) as ActivityEntry[];
-
-      const map = new Map<string, number>();
-      activities.forEach((a) => {
-        const d = a.activity_date;
-        map.set(d, (map.get(d) || 0) + (a.count || 0));
-      });
-      const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
-        .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
-
-      const activeDates = new Set(aggregated.map((a) => a.activity_date));
-
-      setTodos(todosData);
-      setProjects(projectsData);
-      setActivityData(aggregated);
-
-      setStats({
-        totalTodos: todosData.length,
-        completedTodos: completed,
-        totalProjects: projectsData.length || 0,
-        streak: calculateStreak(activeDates),
-      });
-    };
-    fetchData();
-    const refetchAll = async () => {
-      const [todosRes, projectsRes, activityRes] = await Promise.all([
-        supabase.from("todos").select("completed").eq("user_id", user.id),
-        supabase.from("projects").select("id, name, progress").eq("user_id", user.id).order('created_at', { ascending: false }),
-        supabase
-          .from("activity_log")
-          .select("activity_date, count")
-          .eq("user_id", user.id)
-          .gte("activity_date", format(subDays(new Date(), 365), "yyyy-MM-dd"))
-          .order("activity_date", { ascending: true }),
-      ]);
-
-      const todosData = todosRes.data || [];
-      const projectsData = projectsRes.data || [];
-      const completed = todosData.filter((t) => t.completed).length;
-      const activities = (activityRes.data || []) as ActivityEntry[];
-
-      const map = new Map<string, number>();
-      activities.forEach((a) => {
-        const d = a.activity_date;
-        map.set(d, (map.get(d) || 0) + (a.count || 0));
-      });
-      const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
-        .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
-
-      const activeDates = new Set(aggregated.map((a) => a.activity_date));
-
-      setTodos(todosData);
-      setProjects(projectsData);
-      setActivityData(aggregated);
-      setStats({
-        totalTodos: todosData.length,
-        completedTodos: completed,
-        totalProjects: projectsData.length,
-        streak: calculateStreak(activeDates),
-      });
-    };
+    
+    fetchDashboardData();
 
     const channel = supabase.channel(`public:activity_log:user=${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log', filter: `user_id=eq.${user.id}` }, () => {
-        refetchAll();
+        fetchDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `user_id=eq.${user.id}` }, () => {
-        refetchAll();
+        fetchDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${user.id}` }, () => {
-        refetchAll();
+        fetchDashboardData();
       })
       .subscribe();
 
