@@ -49,6 +49,17 @@ const Projects = () => {
 
   useEffect(() => { fetchProjects(); }, [user]);
 
+  const logActivity = async (activityType: string) => {
+    if (!user) return;
+    const today = format(new Date(), "yyyy-MM-dd");
+    await supabase.from("activity_log").insert({
+      user_id: user.id,
+      activity_type: activityType,
+      activity_date: today,
+      count: 1,
+    });
+  };
+
   const createProject = async () => {
     if (!newName.trim() || !user) return;
     const { data, error } = await supabase
@@ -62,6 +73,7 @@ const Projects = () => {
       setNewName("");
       setNewDesc("");
       setDialogOpen(false);
+      await logActivity("project_created");
     }
   };
 
