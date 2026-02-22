@@ -61,7 +61,10 @@ const ContributionChart = ({ activityData = [], weeks = 52, thresholds }: Contri
       if (count <= thresholds[2]) return 3;
       return 4;
     }
-    if (maxCount === 0) return 1;
+    // Even if maxCount is 0, ensure we show some color for activities
+    if (maxCount === 0 && count > 0) return 4;
+    if (maxCount === 0) return 0;
+    
     const step = Math.ceil(maxCount / 4) || 1;
     if (count <= step) return 1;
     if (count <= step * 2) return 2;

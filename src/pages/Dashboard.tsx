@@ -88,7 +88,9 @@ const Dashboard = () => {
       const map = new Map<string, number>();
       activities.forEach((a) => {
         const d = a.activity_date;
-        map.set(d, (map.get(d) || 0) + (a.count || 0));
+        const currentCount = map.get(d) || 0;
+        // Ensure count is at least 1 if activity exists
+        map.set(d, Math.max(currentCount + (a.count || 1), 1));
       });
       const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
         .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
@@ -127,7 +129,9 @@ const Dashboard = () => {
       const map = new Map<string, number>();
       activities.forEach((a) => {
         const d = a.activity_date;
-        map.set(d, (map.get(d) || 0) + (a.count || 0));
+        const currentCount = map.get(d) || 0;
+        // Ensure count is at least 1 if activity exists
+        map.set(d, Math.max(currentCount + (a.count || 1), 1));
       });
       const aggregated = Array.from(map.entries()).map(([activity_date, count]) => ({ activity_date, count } as ActivityEntry))
         .sort((a, b) => a.activity_date.localeCompare(b.activity_date));
