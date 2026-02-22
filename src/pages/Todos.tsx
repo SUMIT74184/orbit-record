@@ -41,6 +41,17 @@ const Todos = () => {
 
   useEffect(() => { fetchTodos(); }, [user]);
 
+  const logActivity = async (activityType: string) => {
+    if (!user) return;
+    const today = format(new Date(), "yyyy-MM-dd");
+    await supabase.from("activity_log").insert({
+      user_id: user.id,
+      activity_type: activityType,
+      activity_date: today,
+      count: 1,
+    });
+  };
+
   const addTodo = async () => {
     if (!newTodo.trim() || !user) return;
     const { data, error } = await supabase
@@ -53,6 +64,7 @@ const Todos = () => {
     } else if (data) {
       setTodos([data, ...todos]);
       setNewTodo("");
+      await logActivity("todo_created");
     }
   };
 
@@ -65,6 +77,9 @@ const Todos = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setTodos(todos.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
+      if (!completed) {
+        await logActivity("todo_completed");
+      }
     }
   };
 
