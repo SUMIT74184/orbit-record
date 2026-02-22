@@ -57,7 +57,7 @@ const Projects = () => {
       .select("count")
       .eq("user_id", user.id)
       .eq("activity_date", today)
-      .single();
+      .maybeSingle();
     
     if (existing) {
       await supabase
