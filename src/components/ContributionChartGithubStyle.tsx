@@ -44,8 +44,7 @@ const ContributionChartGithubStyle = ({ activityData, weeks = 52 }: Contribution
 
   const getLevel = (count: number) => {
     if (count === 0) return 0;
-    // Use dynamic levels to always show colors when there's activity
-    if (count === 1) return 1;
+    if (count <= 1) return 1;
     if (count <= 3) return 2;
     if (count <= 5) return 3;
     return 4;
