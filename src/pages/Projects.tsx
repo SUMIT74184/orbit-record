@@ -52,12 +52,27 @@ const Projects = () => {
   const logActivity = async (activityType: string) => {
     if (!user) return;
     const today = format(new Date(), "yyyy-MM-dd");
-    await supabase.from("activity_log").insert({
-      user_id: user.id,
-      activity_type: activityType,
-      activity_date: today,
-      count: 1,
-    });
+    const { data: existing } = await supabase
+      .from("activity_log")
+      .select("count")
+      .eq("user_id", user.id)
+      .eq("activity_date", today)
+      .single();
+    
+    if (existing) {
+      await supabase
+        .from("activity_log")
+        .update({ count: (existing.count || 0) + 1 })
+        .eq("user_id", user.id)
+        .eq("activity_date", today);
+    } else {
+      await supabase.from("activity_log").insert({
+        user_id: user.id,
+        activity_type: activityType,
+        activity_date: today,
+        count: 1,
+      });
+    }
   };
 
   const createProject = async () => {
@@ -100,11 +115,7 @@ const Projects = () => {
       fetchProjects(); // revert
     } else if (progress === 100 && user) {
       // Log completion activity so the contribution chart can show it
-      const today = format(new Date(), "yyyy-MM-dd");
-      const { error: activityError } = await supabase.from("activity_log").insert({ user_id: user.id, activity_type: "project_completed", activity_date: today,count:1 });
-      if (activityError) {
-        toast({ title: "Activity log error", description: activityError.message, variant: "destructive" });
-      }
+      await logActivity("project_completed");
       toast({ title: "🎉 Project completed!", description: "Great job finishing this project!" });
     }
   };
